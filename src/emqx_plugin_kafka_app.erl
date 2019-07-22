@@ -23,7 +23,7 @@
         ]).
 
 start(_StartType, _StartArgs) ->
-    {ok, Sup} = emqx_plugin_template_sup:start_link(),
+    {ok, Sup} = emqx_plugin_kafka_sup:start_link(),
     emqx_plugin_kafka:load(application:get_all_env()),
     {ok, Sup}.
 

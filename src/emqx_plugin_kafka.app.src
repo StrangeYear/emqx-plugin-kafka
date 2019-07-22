@@ -1,5 +1,5 @@
 {application,emqx_plugin_kafka,
-             [{description,"EMQ X Plugin Template"},
+             [{description,"EMQ X Plugin Kafka"},
               {vsn,"git"},
               {modules,[]},
               {registered,[emqx_plugin_kafka_sup]},
