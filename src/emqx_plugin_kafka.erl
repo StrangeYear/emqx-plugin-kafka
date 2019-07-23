@@ -130,23 +130,19 @@ unload() ->
 ekaf_init(_Env) ->
   % clique 方式读取配置文件
   Env = application:get_env(?APP, kafka),
-  {ok, Kafka} = Env,
-  Host = proplists:get_value(host, Kafka),
-  Port = proplists:get_value(port, Kafka),
-  Broker = {Host, Port},
-  Topic = proplists:get_value(topic, Kafka),
+  Host = proplists:get_value(host, Env),
+  Port = proplists:get_value(port, Env),
+  Topic = proplists:get_value(topic, Env),
   io:format("~w ~w ~w ~n", [Host, Port, Topic]),
 
   % init kafka
+  application:set_env(ekaf, ekaf_bootstrap_broker, {Host, Port}),
   application:set_env(ekaf, ekaf_partition_strategy, strict_round_robin),
-  application:set_env(ekaf, ekaf_bootstrap_broker, Broker),
   application:set_env(ekaf, ekaf_bootstrap_topics, list_to_binary(Topic)),
-  %application:set_env(ekaf, ekaf_bootstrap_broker, {"127.0.0.1", 9092}),
-  %application:set_env(ekaf, ekaf_bootstrap_topics, <<"test">>),
+  application:set_env(ekaf, ekaf_buffer_ttl, 100),
 
   io:format("Init ekaf with ~s:~b~n", [Host, Port]),
-  %%ekaf:produce_async_batched(<<"test">>, list_to_binary(Json)),
-  ok.
+  {ok, _} = application:ensure_all_started(ekaf).
 %% ==================== ekaf_init END.===============================%%
 
 
@@ -236,7 +232,6 @@ ekaf_set_topic(Topic) ->
   ok.
 ekaf_get_topic() ->
   Env = application:get_env(?APP, kafka),
-  {ok, Kafka} = Env,
-  Topic = proplists:get_value(topic, Kafka),
+  Topic = proplists:get_value(topic, Env),
   Topic.
 %% ==================== ekaf_set_topic END.===============================%%
