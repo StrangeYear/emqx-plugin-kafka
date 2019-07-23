@@ -128,15 +128,15 @@ unload() ->
 
 %% ==================== ekaf_init STA.===============================%%
 ekaf_init(_Env) ->
-  application:load(ekaf),
   % clique 方式读取配置文件
-  Env = application:get_env(?APP, kafka),
+  {ok, Env} = application:get_env(?APP, kafka),
   Host = proplists:get_value(host, Env),
   Port = proplists:get_value(port, Env),
   Topic = proplists:get_value(topic, Env),
   io:format("~w ~w ~w ~n", [Host, Port, Topic]),
 
   % init kafka
+  application:load(ekaf),
   application:set_env(ekaf, ekaf_bootstrap_broker, {Host, Port}),
   application:set_env(ekaf, ekaf_partition_strategy, strict_round_robin),
   application:set_env(ekaf, ekaf_bootstrap_topics, list_to_binary(Topic)),
