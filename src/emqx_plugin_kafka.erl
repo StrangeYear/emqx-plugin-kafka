@@ -24,24 +24,13 @@
 
 %% Hooks functions
 
--export([on_client_connected/3, on_client_disconnected/3]).
+-export([on_client_connected/4, on_client_disconnected/3]).
 
--export([on_client_subscribe/4, on_client_unsubscribe/4]).
+-export([on_client_subscribe/3, on_client_unsubscribe/3]).
 
--export([on_session_created/3, on_session_subscribed/4, on_session_unsubscribed/4, on_session_terminated/4]).
+-export([on_session_created/3, on_session_subscribed/4, on_session_unsubscribed/4, on_session_terminated/3]).
 
--export([on_message_publish/2, on_message_delivered/4, on_message_acked/4]).
-
--record(mqtt_message, {id,
-  from,
-  topic,
-  payload,
-  qos,
-  dup,
-  retain,
-  timestamp}).
-
--type(mqtt_message() :: #mqtt_message{}).
+-export([on_message_publish/2, on_message_delivered/3, on_message_acked/3]).
 
 %% Called when the plugin application start
 load(Env) ->
@@ -59,54 +48,150 @@ load(Env) ->
   emqx:hook('message.acked', fun ?MODULE:on_message_acked/3, [Env]),
   io:format("load completed~n", []).
 
-on_client_connected(ConnAck, Client = #{client_id := ClientId}, _Env) ->
-  io:format("client ~s connected, connack: ~w~n", [ClientId, ConnAck]),
-  ekaf_send(<<"connected">>, ClientId, {}, _Env),
-  {ok, Client}.
+%%--------------------------------------------------------------------
+%% Client connected
+%%--------------------------------------------------------------------
 
-on_client_disconnected(Reason, _Client = #{client_id := ClientId}, _Env) ->
-  io:format("client ~s disconnected, reason: ~w~n", [ClientId, Reason]),
-  ekaf_send(<<"disconnected">>, ClientId, {}, _Env),
+on_client_connected(#{client_id := ClientId, username := Username}, 0, ConnInfo, _Env) ->
+  {IpAddr, _Port} = maps:get(peername, ConnInfo),
+  Params = [{action, client_connected},
+              {client_id, ClientId},
+              {username, Username},
+              {keepalive, maps:get(keepalive, ConnInfo)},
+              {ipaddress, iolist_to_binary(ntoa(IpAddr))},
+              {proto_ver, maps:get(proto_ver, ConnInfo)},
+              {connected_at, emqx_time:now_secs(maps:get(connected_at, ConnInfo))},
+              {conn_ack, 0}],
+  ekaf_send(<<"connected">>, Params),
+  ok;
+
+on_client_connected(#{}, _ConnAck, _ConnInfo, _Env) ->
+    ok.
+
+%%--------------------------------------------------------------------
+%% Client disconnected
+%%--------------------------------------------------------------------
+
+on_client_disconnected(#{}, auth_failure, _Env) ->
+    ok;
+
+on_client_disconnected(Client, {shutdown, Reason}, Env) when is_atom(Reason) ->
+    on_client_disconnected(Reason, Client, Env);
+
+on_client_disconnected(#{client_id := ClientId, username := Username}, Reason, _Env)
+    when is_atom(Reason) ->
+    Params = [{action, client_disconnected},
+              {client_id, ClientId},
+              {username, Username},
+              {reason, Reason}],
+    ekaf_send(<<"disconnected">>, Params),
+    ok;
+
+on_client_disconnected(_, Reason, _Env) ->
+    ok.
+
+%%--------------------------------------------------------------------
+%% Client subscribe
+%%--------------------------------------------------------------------
+
+on_client_subscribe(#{client_id := ClientId, username := Username}, TopicTable, {Filter}) ->
+  {ok, TopicTable}.
+
+%%--------------------------------------------------------------------
+%% Client unsubscribe
+%%--------------------------------------------------------------------
+
+on_client_unsubscribe(#{client_id := ClientId, username := Username}, TopicTable, {Filter}) ->
+  {ok, TopicTable}.
+
+%%--------------------------------------------------------------------
+%% Session created
+%%--------------------------------------------------------------------
+
+on_session_created(#{client_id := ClientId, username := Username}, SessInfo, _Env) ->
+  io:format("session(~s/~s) created.", [ClientId, Username]),
   ok.
 
-on_client_subscribe(ClientId, Username, TopicTable, _Env) ->
-  io:format("client(~s/~s) will subscribe: ~p~n", [Username, ClientId, TopicTable]),
-  {ok, TopicTable}.
+%%--------------------------------------------------------------------
+%% Session subscribed
+%%--------------------------------------------------------------------
 
-on_client_unsubscribe(ClientId, Username, TopicTable, _Env) ->
-  io:format("client(~s/~s) unsubscribe ~p~n", [ClientId, Username, TopicTable]),
-  {ok, TopicTable}.
-
-on_session_created(ClientId, Username, _Env) ->
-  io:format("session(~s/~s) created.", [ClientId, Username]).
-
-on_session_subscribed(ClientId, Username, {Topic, Opts}, _Env) ->
+on_session_subscribed(#{client_id := ClientId, username := Username}, Topic, Opts, {Filter}) ->
   io:format("session(~s/~s) subscribed: ~p~n", [Username, ClientId, {Topic, Opts}]),
-  ekaf_send(<<"subscribed">>, ClientId, {Topic, Opts}, _Env),
+  Params = [{action, session_subscribed},
+                  {client_id, ClientId},
+                  {username, Username},
+                  {topic, Topic},
+                  {opts, Opts}],
+  ekaf_send(<<"subscribed">>, Params),
   {ok, {Topic, Opts}}.
 
-on_session_unsubscribed(ClientId, Username, {Topic, Opts}, _Env) ->
+%%--------------------------------------------------------------------
+%% Session unsubscribed
+%%--------------------------------------------------------------------
+
+on_session_unsubscribed(#{client_id := ClientId, username := Username}, Topic, _Opts, {Filter}) ->
   io:format("session(~s/~s) unsubscribed: ~p~n", [Username, ClientId, {Topic, Opts}]),
-  ekaf_send(<<"unsubscribed">>, ClientId, {Topic, Opts}, _Env),
   ok.
 
-on_session_terminated(ClientId, Username, Reason, _Env) ->
-  io:format("session(~s/~s) terminated: ~p.", [ClientId, Username, Reason]).
+%%--------------------------------------------------------------------
+%% Session terminated
+%%--------------------------------------------------------------------
 
-%% transform message and return
-on_message_publish(Message = #mqtt_message{topic = <<"$SYS/", _/binary>>}, _Env) ->
-  {ok, Message};
+on_session_terminated(Info, {shutdown, Reason}, Env) when is_atom(Reason) ->
+    on_session_terminated(Info, Reason, Env);
 
-on_message_publish(Message, _Env) ->
-  io:format("publish ~s~n", [emqx_message:format(Message)]),
-  ekaf_send(<<"public">>, {}, Message, _Env),
+on_session_terminated(#{client_id := ClientId, username := Username}, Reason, _Env) when is_atom(Reason) ->
+    io:format("session(~s/~s) terminated: ~p.", [ClientId, Username, Reason]).
+    ok;
+
+on_session_terminated(#{}, Reason, _Env) ->
+    ok.
+
+%%--------------------------------------------------------------------
+%% Message publish
+%%--------------------------------------------------------------------
+
+on_message_publish(Message = #message{topic = <<"$SYS/", _/binary>>}, _Env) ->
+    {ok, Message};
+
+on_message_publish(Message = #message{topic = Topic, flags = #{retain := Retain}}, {Filter}) ->
+        {FromClientId, FromUsername} = format_from(Message),
+        Params = [{action, message_publish},
+                  {from_client_id, FromClientId},
+                  {from_username, FromUsername},
+                  {topic, Message#message.topic},
+                  {qos, Message#message.qos},
+                  {retain, Retain},
+                  {payload, Message#message.payload},
+                  {ts, emqx_time:now_secs(Message#message.timestamp)}],
+  ekaf_send(<<"publish">>, Params),
   {ok, Message}.
 
-on_message_delivered(ClientId, Username, Message, _Env) ->
-  io:format("delivered to client(~s/~s): ~s~n", [Username, ClientId, emqx_message:format(Message)]),
+%%--------------------------------------------------------------------
+%% Message deliver
+%%--------------------------------------------------------------------
+
+on_message_delivered(#{client_id := ClientId, username := Username}, Message = #message{topic = Topic, flags = #{retain := Retain}}, {Filter}) ->
+      {FromClientId, FromUsername} = format_from(Message),
+      Params = [{action, message_deliver},
+                {client_id, ClientId},
+                {username, Username},
+                {from_client_id, FromClientId},
+                {from_username, FromUsername},
+                {topic, Message#message.topic},
+                {qos, Message#message.qos},
+                {retain, Retain},
+                {payload, Message#message.payload},
+                {ts, emqx_time:now_secs(Message#message.timestamp)}],
+  ekaf_send(<<"public">>, Params),
   {ok, Message}.
 
-on_message_acked(ClientId, Username, Message, _Env) ->
+%%--------------------------------------------------------------------
+%% Message acked
+%%--------------------------------------------------------------------
+
+on_message_acked(#{client_id := ClientId}, Message = #message{topic = Topic, flags = #{retain := Retain}}, {Filter}) ->
   io:format("client(~s/~s) acked: ~s~n", [Username, ClientId, emqx_message:format(Message)]),
   {ok, Message}.
 
@@ -150,59 +235,8 @@ ekaf_init(_Env) ->
 
 
 %% ==================== ekaf_send STA.===============================%%
-ekaf_send(Type, ClientId, {}, _Env) ->
-  Json = mochijson2:encode([
-    {type, Type},
-    {client_id, ClientId},
-    {message, {}},
-    {cluster_node, node()},
-    {ts, emqx_time:now_ms()}
-  ]),
-  ekaf_send_sync(Json);
-ekaf_send(Type, ClientId, {Reason}, _Env) ->
-  Json = mochijson2:encode([
-    {type, Type},
-    {client_id, ClientId},
-    {cluster_node, node()},
-    {message, Reason},
-    {ts, emqx_time:now_ms()}
-  ]),
-  ekaf_send_sync(Json);
-ekaf_send(Type, ClientId, {Topic, Opts}, _Env) ->
-  Json = mochijson2:encode([
-    {type, Type},
-    {client_id, ClientId},
-    {cluster_node, node()},
-    {message, [
-      {topic, Topic},
-      {opts, Opts}
-    ]},
-    {ts, emqx_time:now_ms()}
-  ]),
-  ekaf_send_sync(Json);
-ekaf_send(Type, _, Message, _Env) ->
-  {ClientId, Username} = format_from(Message#mqtt_message.from),
-  Topic = Message#mqtt_message.topic,
-  Payload = Message#mqtt_message.payload,
-  Qos = Message#mqtt_message.qos,
-  Dup = Message#mqtt_message.dup,
-  Retain = Message#mqtt_message.retain,
-  Timestamp = Message#mqtt_message.timestamp,
-
-  Json = mochijson2:encode([
-    {type, Type},
-    {client_id, ClientId},
-    {message, [
-      {username, Username},
-      {topic, Topic},
-      {payload, Payload},
-      {qos, Qos},
-      {dup, Dup},
-      {retain, Retain}
-    ]},
-    {cluster_node, node()},
-    {ts, emqx_time:now_ms()}
-  ]),
+ekaf_send(Type, Params) ->
+  Json = mochijson2:encode(Params),
   ekaf_send_sync(Json).
 
 ekaf_send_sync(Msg) ->
@@ -211,17 +245,14 @@ ekaf_send_sync(Msg) ->
 ekaf_send_sync(Topic, Msg) ->
   ekaf:produce_sync_batched(list_to_binary(Topic), list_to_binary(Msg)).
 
-format_from({ClientId, Username}) ->
-    {ClientId, Username};
-format_from(From) when is_atom(From) ->
-    {a2b(From), a2b(From)};
-format_from(_) ->
-    {<<>>, <<>>}.
-a2b(A) -> erlang:atom_to_binary(A, utf8).
+format_from(#message{from = ClientId, headers = #{username := Username}}) ->
+    {a2b(ClientId), a2b(Username)};
+format_from(#message{from = ClientId, headers = _HeadersNoUsername}) ->
+    {a2b(ClientId), <<"undefined">>}.
+
+a2b(A) when is_atom(A) -> erlang:atom_to_binary(A, utf8);
+a2b(A) -> A.
 %% ==================== ekaf_send END.===============================%%
-
-
-
 
 %% ==================== ekaf_set_topic STA.===============================%%
 ekaf_set_topic(Topic) ->
