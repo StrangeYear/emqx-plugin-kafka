@@ -108,8 +108,8 @@ on_client_unsubscribe(#{client_id := ClientId, username := Username}, TopicTable
 %% Session created
 %%--------------------------------------------------------------------
 
-on_session_created(#{client_id := ClientId, username := Username}, SessInfo, _Env) ->
-  io:format("session(~s/~s) created.", [ClientId, Username]),
+on_session_created(#{client_id := ClientId}, SessInfo, _Env) ->
+  io:format("session(~s) created.", [ClientId]),
   ok.
 
 %%--------------------------------------------------------------------
@@ -130,8 +130,8 @@ on_session_subscribed(#{client_id := ClientId, username := Username}, Topic, Opt
 %% Session unsubscribed
 %%--------------------------------------------------------------------
 
-on_session_unsubscribed(#{client_id := ClientId, username := Username}, Topic, _Opts, {Filter}) ->
-  io:format("session(~s/~s) unsubscribed: ~p~n", [Username, ClientId, {Topic, Opts}]),
+on_session_unsubscribed(#{client_id := ClientId}, Topic, Opts, {Filter}) ->
+  io:format("session(~s/~s) unsubscribed: ~p~n", [ClientId, {Topic, Opts}]),
   ok.
 
 %%--------------------------------------------------------------------
@@ -141,8 +141,8 @@ on_session_unsubscribed(#{client_id := ClientId, username := Username}, Topic, _
 on_session_terminated(Info, {shutdown, Reason}, Env) when is_atom(Reason) ->
     on_session_terminated(Info, Reason, Env);
 
-on_session_terminated(#{client_id := ClientId, username := Username}, Reason, _Env) when is_atom(Reason) ->
-    io:format("session(~s/~s) terminated: ~p.", [ClientId, Username, Reason]),
+on_session_terminated(#{client_id := ClientId}, Reason, _Env) when is_atom(Reason) ->
+    io:format("session(~s) terminated: ~p.", [ClientId, Reason]),
     ok;
 
 on_session_terminated(#{}, Reason, _Env) ->
@@ -254,7 +254,7 @@ ntoa({0,0,0,0,0,16#ffff,AB,CD}) ->
     inet_parse:ntoa({AB bsr 8, AB rem 256, CD bsr 8, CD rem 256});
 ntoa(IP) ->
     inet_parse:ntoa(IP).
-    
+
 %% ==================== ekaf_send END.===============================%%
 
 %% ==================== ekaf_set_topic STA.===============================%%
