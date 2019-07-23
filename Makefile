@@ -1,8 +1,7 @@
 ## shallow clone for speed
 
-DEPS = ekaf cuttlefish
+DEPS = ekaf
 dep_ekaf = git https://github.com/helpshift/ekaf master
-dep_cuttlefish = git https://github.com/emqtt/cuttlefish
 
 REBAR_GIT_CLONE_OPTIONS += --depth 1
 export REBAR_GIT_CLONE_OPTIONS
