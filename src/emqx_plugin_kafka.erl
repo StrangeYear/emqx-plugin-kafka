@@ -142,7 +142,7 @@ on_session_terminated(Info, {shutdown, Reason}, Env) when is_atom(Reason) ->
     on_session_terminated(Info, Reason, Env);
 
 on_session_terminated(#{client_id := ClientId, username := Username}, Reason, _Env) when is_atom(Reason) ->
-    io:format("session(~s/~s) terminated: ~p.", [ClientId, Username, Reason]).
+    io:format("session(~s/~s) terminated: ~p.", [ClientId, Username, Reason]),
     ok;
 
 on_session_terminated(#{}, Reason, _Env) ->
@@ -230,9 +230,6 @@ ekaf_init(_Env) ->
 
   io:format("Init ekaf with ~s:~b~n", [Host, Port]).
 %% ==================== ekaf_init END.===============================%%
-
-
-
 
 %% ==================== ekaf_send STA.===============================%%
 ekaf_send(Type, Params) ->
