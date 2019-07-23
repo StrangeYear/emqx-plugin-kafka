@@ -197,7 +197,7 @@ ekaf_send(Type, _, Message, _Env) ->
       {topic, Topic},
       {payload, Payload},
       {qos, Qos},
-      {dup, i(Dup)},
+      {dup, Dup},
       {retain, Retain}
     ]},
     {cluster_node, node()},
