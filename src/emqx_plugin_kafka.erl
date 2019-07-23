@@ -192,7 +192,6 @@ on_message_delivered(#{client_id := ClientId, username := Username}, Message = #
 %%--------------------------------------------------------------------
 
 on_message_acked(#{client_id := ClientId}, Message = #message{topic = Topic, flags = #{retain := Retain}}, {Filter}) ->
-  io:format("client(~s/~s) acked: ~s~n", [Username, ClientId, emqx_message:format(Message)]),
   {ok, Message}.
 
 %% Called when the plugin application stop
