@@ -232,7 +232,7 @@ ekaf_init(_Env) ->
 
 %% ==================== ekaf_send STA.===============================%%
 ekaf_send(Type, Params) ->
-  Json = mochijson2:encode(Params),
+  Json = jsx:encode(Params),
   ekaf_send_sync(Json).
 
 ekaf_send_sync(Msg) ->
