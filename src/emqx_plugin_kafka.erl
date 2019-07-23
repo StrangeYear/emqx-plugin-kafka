@@ -261,7 +261,7 @@ ekaf_set_topic(Topic) ->
   application:set_env(ekaf, ekaf_bootstrap_topics, list_to_binary(Topic)),
   ok.
 ekaf_get_topic() ->
-  Env = application:get_env(?APP, kafka),
+  {ok, Env} = application:get_env(?APP, kafka),
   Topic = proplists:get_value(topic, Env),
   Topic.
 %% ==================== ekaf_set_topic END.===============================%%
