@@ -95,8 +95,7 @@ on_session_terminated(ClientId, Username, Reason, _Env) ->
 
 %% transform message and return
 on_message_publish(Message = #mqtt_message{topic = <<"$SYS/", _/binary>>}, _Env) ->
-  ekaf_send(<<"public">>, {}, Message, _Env),
-  {ok, Message}.
+  {ok, Message};
 
 on_message_publish(Message, _Env) ->
   io:format("publish ~s~n", [emqx_message:format(Message)]),
