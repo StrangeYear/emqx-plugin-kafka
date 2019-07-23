@@ -181,16 +181,13 @@ ekaf_send(Type, ClientId, {Topic, Opts}, _Env) ->
   ]),
   ekaf_send_sync(Json);
 ekaf_send(Type, _, Message, _Env) ->
-  From = Message#mqtt_message.from, %需要登录和不需要登录这里的返回值是不一样的
+  {ClientId, Username} = format_from(Message#mqtt_message.from),
   Topic = Message#mqtt_message.topic,
   Payload = Message#mqtt_message.payload,
   Qos = Message#mqtt_message.qos,
   Dup = Message#mqtt_message.dup,
   Retain = Message#mqtt_message.retain,
   Timestamp = Message#mqtt_message.timestamp,
-
-  ClientId = c(From),
-  Username = u(From),
 
   Json = mochijson2:encode([
     {type, Type},
@@ -199,9 +196,9 @@ ekaf_send(Type, _, Message, _Env) ->
       {username, Username},
       {topic, Topic},
       {payload, Payload},
-      {qos, i(Qos)},
+      {qos, Qos},
       {dup, i(Dup)},
-      {retain, i(Retain)}
+      {retain, Retain}
     ]},
     {cluster_node, node()},
     {ts, emqx_time:now_ms()}
@@ -214,13 +211,13 @@ ekaf_send_sync(Msg) ->
 ekaf_send_sync(Topic, Msg) ->
   ekaf:produce_sync_batched(list_to_binary(Topic), list_to_binary(Msg)).
 
-i(true) -> 1;
-i(false) -> 0;
-i(I) when is_integer(I) -> I.
-c({ClientId, Username}) -> ClientId;
-c(From) -> From.
-u({ClientId, Username}) -> Username;
-u(From) -> From.
+format_from({ClientId, Username}) ->
+    {ClientId, Username};
+format_from(From) when is_atom(From) ->
+    {a2b(From), a2b(From)};
+format_from(_) ->
+    {<<>>, <<>>}.
+a2b(A) -> erlang:atom_to_binary(A, utf8).
 %% ==================== ekaf_send END.===============================%%
 
 
