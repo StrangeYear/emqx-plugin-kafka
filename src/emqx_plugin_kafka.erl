@@ -239,7 +239,7 @@ ekaf_send_sync(Msg) ->
   Topic = ekaf_get_topic(),
   ekaf_send_sync(Topic, Msg).
 ekaf_send_sync(Topic, Msg) ->
-  ekaf:produce_sync_batched(list_to_binary(Topic), list_to_binary(Msg)).
+  ekaf:produce_sync_batched(list_to_binary(Topic), Msg).
 
 format_from(#message{from = ClientId, headers = #{username := Username}}) ->
     {a2b(ClientId), a2b(Username)};
