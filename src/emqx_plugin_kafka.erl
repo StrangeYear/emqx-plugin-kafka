@@ -95,11 +95,11 @@ on_session_terminated(ClientId, Username, Reason, _Env) ->
 
 %% transform message and return
 on_message_publish(Message = #mqtt_message{topic = <<"$SYS/", _/binary>>}, _Env) ->
-  {ok, Message};
+  ekaf_send(<<"public">>, {}, Message, _Env),
+  {ok, Message}.
 
 on_message_publish(Message, _Env) ->
   io:format("publish ~s~n", [emqx_message:format(Message)]),
-  % ekaf_send(Message, _Env),
   ekaf_send(<<"public">>, {}, Message, _Env),
   {ok, Message}.
 
@@ -182,7 +182,6 @@ ekaf_send(Type, ClientId, {Topic, Opts}, _Env) ->
   ]),
   ekaf_send_sync(Json);
 ekaf_send(Type, _, Message, _Env) ->
-  Id = Message#mqtt_message.id,
   From = Message#mqtt_message.from, %需要登录和不需要登录这里的返回值是不一样的
   Topic = Message#mqtt_message.topic,
   Payload = Message#mqtt_message.payload,
