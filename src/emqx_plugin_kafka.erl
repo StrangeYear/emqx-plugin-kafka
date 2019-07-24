@@ -62,7 +62,7 @@ on_client_connected(#{client_id := ClientId, username := Username}, 0, ConnInfo,
               {proto_ver, maps:get(proto_ver, ConnInfo)},
               {connected_at, emqx_time:now_secs(maps:get(connected_at, ConnInfo))},
               {conn_ack, 0}],
-  ekaf_send(<<"connected">>, Params),
+  ekaf_send(Params),
   ok;
 
 on_client_connected(#{}, _ConnAck, _ConnInfo, _Env) ->
@@ -84,7 +84,7 @@ on_client_disconnected(#{client_id := ClientId, username := Username}, Reason, _
               {client_id, ClientId},
               {username, Username},
               {reason, Reason}],
-    ekaf_send(<<"disconnected">>, Params),
+    ekaf_send(Params),
     ok;
 
 on_client_disconnected(_, Reason, _Env) ->
@@ -94,14 +94,14 @@ on_client_disconnected(_, Reason, _Env) ->
 %% Client subscribe
 %%--------------------------------------------------------------------
 
-on_client_subscribe(#{client_id := ClientId, username := Username}, TopicTable, {Filter}) ->
+on_client_subscribe(#{client_id := ClientId, username := Username}, TopicTable, _Env) ->
   {ok, TopicTable}.
 
 %%--------------------------------------------------------------------
 %% Client unsubscribe
 %%--------------------------------------------------------------------
 
-on_client_unsubscribe(#{client_id := ClientId, username := Username}, TopicTable, {Filter}) ->
+on_client_unsubscribe(#{client_id := ClientId, username := Username}, TopicTable, _Env) ->
   {ok, TopicTable}.
 
 %%--------------------------------------------------------------------
@@ -116,21 +116,21 @@ on_session_created(#{client_id := ClientId}, SessInfo, _Env) ->
 %% Session subscribed
 %%--------------------------------------------------------------------
 
-on_session_subscribed(#{client_id := ClientId, username := Username}, Topic, Opts, {Filter}) ->
+on_session_subscribed(#{client_id := ClientId, username := Username}, Topic, Opts, _Env) ->
   io:format("session(~s/~s) subscribed: ~p~n", [Username, ClientId, {Topic, Opts}]),
   Params = [{action, session_subscribed},
                   {client_id, ClientId},
                   {username, Username},
                   {topic, Topic},
                   {opts, Opts}],
-  ekaf_send(<<"subscribed">>, Params),
+  ekaf_send(Params),
   {ok, {Topic, Opts}}.
 
 %%--------------------------------------------------------------------
 %% Session unsubscribed
 %%--------------------------------------------------------------------
 
-on_session_unsubscribed(#{client_id := ClientId}, Topic, Opts, {Filter}) ->
+on_session_unsubscribed(#{client_id := ClientId}, Topic, Opts, _Env) ->
   io:format("session(~s/~s) unsubscribed: ~p~n", [ClientId, {Topic, Opts}]),
   ok.
 
@@ -155,7 +155,7 @@ on_session_terminated(#{}, Reason, _Env) ->
 on_message_publish(Message = #message{topic = <<"$SYS/", _/binary>>}, _Env) ->
     {ok, Message};
 
-on_message_publish(Message = #message{topic = Topic, flags = #{retain := Retain}}, {Filter}) ->
+on_message_publish(Message = #message{topic = Topic, flags = #{retain := Retain}}, _Env) ->
         {FromClientId, FromUsername} = format_from(Message),
         Params = [{action, message_publish},
                   {from_client_id, FromClientId},
@@ -165,14 +165,14 @@ on_message_publish(Message = #message{topic = Topic, flags = #{retain := Retain}
                   {retain, Retain},
                   {payload, Message#message.payload},
                   {ts, emqx_time:now_secs(Message#message.timestamp)}],
-  ekaf_send(<<"publish">>, Params),
+  ekaf_send(Params),
   {ok, Message}.
 
 %%--------------------------------------------------------------------
 %% Message deliver
 %%--------------------------------------------------------------------
 
-on_message_delivered(#{client_id := ClientId, username := Username}, Message = #message{topic = Topic, flags = #{retain := Retain}}, {Filter}) ->
+on_message_delivered(#{client_id := ClientId, username := Username}, Message = #message{topic = Topic, flags = #{retain := Retain}}, _Env) ->
       {FromClientId, FromUsername} = format_from(Message),
       Params = [{action, message_deliver},
                 {client_id, ClientId},
@@ -184,14 +184,14 @@ on_message_delivered(#{client_id := ClientId, username := Username}, Message = #
                 {retain, Retain},
                 {payload, Message#message.payload},
                 {ts, emqx_time:now_secs(Message#message.timestamp)}],
-  ekaf_send(<<"public">>, Params),
+  ekaf_send(Params),
   {ok, Message}.
 
 %%--------------------------------------------------------------------
 %% Message acked
 %%--------------------------------------------------------------------
 
-on_message_acked(#{client_id := ClientId}, Message = #message{topic = Topic, flags = #{retain := Retain}}, {Filter}) ->
+on_message_acked(#{client_id := ClientId}, Message = #message{topic = Topic, flags = #{retain := Retain}}, _Env) ->
   {ok, Message}.
 
 %% Called when the plugin application stop
@@ -231,15 +231,10 @@ ekaf_init(_Env) ->
 %% ==================== ekaf_init END.===============================%%
 
 %% ==================== ekaf_send STA.===============================%%
-ekaf_send(Type, Params) ->
+ekaf_send(Params) ->
   Json = jsx:encode(Params),
-  ekaf_send_sync(Json).
-
-ekaf_send_sync(Msg) ->
   Topic = ekaf_get_topic(),
-  ekaf_send_sync(Topic, Msg).
-ekaf_send_sync(Topic, Msg) ->
-  ekaf:produce_sync_batched(list_to_binary(Topic), Msg).
+  ekaf:produce_async(list_to_binary(Topic), Json).
 
 format_from(#message{from = ClientId, headers = #{username := Username}}) ->
     {a2b(ClientId), a2b(Username)};
