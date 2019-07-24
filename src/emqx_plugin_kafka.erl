@@ -35,17 +35,17 @@
 %% Called when the plugin application start
 load(Env) ->
   ekaf_init([Env]),
+%%  emqx:hook('client.subscribe', fun ?MODULE:on_client_subscribe/3, [Env]),
+%%  emqx:hook('client.unsubscribe', fun ?MODULE:on_client_unsubscribe/3, [Env]),
+%%  emqx:hook('session.created', fun ?MODULE:on_session_created/3, [Env]),
+%%  emqx:hook('session.subscribed', fun ?MODULE:on_session_subscribed/4, [Env]),
+%%  emqx:hook('session.unsubscribed', fun ?MODULE:on_session_unsubscribed/4, [Env]),
+%%  emqx:hook('session.terminated', fun ?MODULE:on_session_terminated/3, [Env]),
+%%  emqx:hook('message.delivered', fun ?MODULE:on_message_delivered/3, [Env]),
+%%  emqx:hook('message.acked', fun ?MODULE:on_message_acked/3, [Env]),
   emqx:hook('client.connected', fun ?MODULE:on_client_connected/4, [Env]),
   emqx:hook('client.disconnected', fun ?MODULE:on_client_disconnected/3, [Env]),
-  emqx:hook('client.subscribe', fun ?MODULE:on_client_subscribe/3, [Env]),
-  emqx:hook('client.unsubscribe', fun ?MODULE:on_client_unsubscribe/3, [Env]),
-  emqx:hook('session.created', fun ?MODULE:on_session_created/3, [Env]),
-  emqx:hook('session.subscribed', fun ?MODULE:on_session_subscribed/4, [Env]),
-  emqx:hook('session.unsubscribed', fun ?MODULE:on_session_unsubscribed/4, [Env]),
-  emqx:hook('session.terminated', fun ?MODULE:on_session_terminated/3, [Env]),
   emqx:hook('message.publish', fun ?MODULE:on_message_publish/2, [Env]),
-  emqx:hook('message.delivered', fun ?MODULE:on_message_delivered/3, [Env]),
-  emqx:hook('message.acked', fun ?MODULE:on_message_acked/3, [Env]),
   io:format("load completed~n", []).
 
 %%--------------------------------------------------------------------
@@ -55,13 +55,13 @@ load(Env) ->
 on_client_connected(#{client_id := ClientId, username := Username}, 0, ConnInfo, _Env) ->
   {IpAddr, _Port} = maps:get(peername, ConnInfo),
   Params = [{action, client_connected},
-              {client_id, ClientId},
+              {clientId, ClientId},
               {username, Username},
               {keepalive, maps:get(keepalive, ConnInfo)},
               {ipaddress, iolist_to_binary(ntoa(IpAddr))},
-              {proto_ver, maps:get(proto_ver, ConnInfo)},
-              {connected_at, emqx_time:now_secs(maps:get(connected_at, ConnInfo))},
-              {conn_ack, 0}],
+              {protoVer, maps:get(proto_ver, ConnInfo)},
+              {connectedAt, emqx_time:now_secs(maps:get(connected_at, ConnInfo))},
+              {connAck, 0}],
   ekaf_send(Params),
   ok;
 
@@ -81,7 +81,7 @@ on_client_disconnected(Client, {shutdown, Reason}, Env) when is_atom(Reason) ->
 on_client_disconnected(#{client_id := ClientId, username := Username}, Reason, _Env)
     when is_atom(Reason) ->
     Params = [{action, client_disconnected},
-              {client_id, ClientId},
+              {clientId, ClientId},
               {username, Username},
               {reason, Reason}],
     ekaf_send(Params),
@@ -119,7 +119,7 @@ on_session_created(#{client_id := ClientId}, SessInfo, _Env) ->
 on_session_subscribed(#{client_id := ClientId, username := Username}, Topic, Opts, _Env) ->
   io:format("session(~s/~s) subscribed: ~p~n", [Username, ClientId, {Topic, Opts}]),
   Params = [{action, session_subscribed},
-                  {client_id, ClientId},
+                  {clientId, ClientId},
                   {username, Username},
                   {topic, Topic},
                   {opts, Opts}],
@@ -157,9 +157,9 @@ on_message_publish(Message = #message{topic = <<"$SYS/", _/binary>>}, _Env) ->
 
 on_message_publish(Message = #message{topic = Topic, flags = #{retain := Retain}}, _Env) ->
         {FromClientId, FromUsername} = format_from(Message),
-        Params = [{action, message_publish},
-                  {from_client_id, FromClientId},
-                  {from_username, FromUsername},
+        Params = [{action, publish},
+                  {clientId, FromClientId},
+                  {username, FromUsername},
                   {topic, Message#message.topic},
                   {qos, Message#message.qos},
                   {retain, Retain},
@@ -174,11 +174,11 @@ on_message_publish(Message = #message{topic = Topic, flags = #{retain := Retain}
 
 on_message_delivered(#{client_id := ClientId, username := Username}, Message = #message{topic = Topic, flags = #{retain := Retain}}, _Env) ->
       {FromClientId, FromUsername} = format_from(Message),
-      Params = [{action, message_deliver},
-                {client_id, ClientId},
+      Params = [{action, deliver},
+                {clientId, ClientId},
                 {username, Username},
-                {from_client_id, FromClientId},
-                {from_username, FromUsername},
+                {fromClientId, FromClientId},
+                {fromUsername, FromUsername},
                 {topic, Message#message.topic},
                 {qos, Message#message.qos},
                 {retain, Retain},
@@ -196,17 +196,17 @@ on_message_acked(#{client_id := ClientId}, Message = #message{topic = Topic, fla
 
 %% Called when the plugin application stop
 unload() ->
+%%  emqx:unhook('client.subscribe', fun ?MODULE:on_client_subscribe/3),
+%%  emqx:unhook('client.unsubscribe', fun ?MODULE:on_client_unsubscribe/3),
+%%  emqx:unhook('session.created', fun ?MODULE:on_session_created/3),
+%%  emqx:unhook('session.subscribed', fun ?MODULE:on_session_subscribed/4),
+%%  emqx:unhook('session.unsubscribed', fun ?MODULE:on_session_unsubscribed/4),
+%%  emqx:unhook('session.terminated', fun ?MODULE:on_session_terminated/3),
+%%  emqx:unhook('message.delivered', fun ?MODULE:on_message_delivered/3),
+%%  emqx:unhook('message.acked', fun ?MODULE:on_message_acked/3),
   emqx:unhook('client.connected', fun ?MODULE:on_client_connected/4),
   emqx:unhook('client.disconnected', fun ?MODULE:on_client_disconnected/3),
-  emqx:unhook('client.subscribe', fun ?MODULE:on_client_subscribe/3),
-  emqx:unhook('client.unsubscribe', fun ?MODULE:on_client_unsubscribe/3),
-  emqx:unhook('session.created', fun ?MODULE:on_session_created/3),
-  emqx:unhook('session.subscribed', fun ?MODULE:on_session_subscribed/4),
-  emqx:unhook('session.unsubscribed', fun ?MODULE:on_session_unsubscribed/4),
-  emqx:unhook('session.terminated', fun ?MODULE:on_session_terminated/3),
-  emqx:unhook('message.publish', fun ?MODULE:on_message_publish/2),
-  emqx:unhook('message.delivered', fun ?MODULE:on_message_delivered/3),
-  emqx:unhook('message.acked', fun ?MODULE:on_message_acked/3).
+  emqx:unhook('message.publish', fun ?MODULE:on_message_publish/2).
 
 
 %% ==================== ekaf_init STA.===============================%%
