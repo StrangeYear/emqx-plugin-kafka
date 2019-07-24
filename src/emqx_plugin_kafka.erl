@@ -54,7 +54,7 @@ load(Env) ->
 
 on_client_connected(#{client_id := ClientId, username := Username}, 0, ConnInfo, _Env) ->
   {IpAddr, _Port} = maps:get(peername, ConnInfo),
-  Params = [{action, client_connected},
+  Params = [{action, connected},
               {clientId, ClientId},
               {username, Username},
               {keepalive, maps:get(keepalive, ConnInfo)},
@@ -80,7 +80,7 @@ on_client_disconnected(Client, {shutdown, Reason}, Env) when is_atom(Reason) ->
 
 on_client_disconnected(#{client_id := ClientId, username := Username}, Reason, _Env)
     when is_atom(Reason) ->
-    Params = [{action, client_disconnected},
+    Params = [{action, disconnected},
               {clientId, ClientId},
               {username, Username},
               {reason, Reason}],
@@ -118,7 +118,7 @@ on_session_created(#{client_id := ClientId}, SessInfo, _Env) ->
 
 on_session_subscribed(#{client_id := ClientId, username := Username}, Topic, Opts, _Env) ->
   io:format("session(~s/~s) subscribed: ~p~n", [Username, ClientId, {Topic, Opts}]),
-  Params = [{action, session_subscribed},
+  Params = [{action, sessionSubscribed},
                   {clientId, ClientId},
                   {username, Username},
                   {topic, Topic},
